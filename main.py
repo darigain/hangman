@@ -13,23 +13,15 @@ list_of_words = ['apple', 'banana', 'grape', 'orange', 'strawberry', 'pear', 'pe
 'sun', 'moon', 'star', 'planet', 'comet', 'asteroid', 'galaxy', 'universe', 'earth', 'mars', 
 'chair', 'table', 'sofa', 'bed', 'desk', 'lamp', 'mirror', 'clock', 'shelf', 'cabinet']
 
-# Initialize session state variables
+# Initialize session state variables to store word and game state
 if 'word' not in st.session_state:
     st.session_state.word = ''
 if 'hidden_word' not in st.session_state:
     st.session_state.hidden_word = ''
 if 'mistake_counter' not in st.session_state:
     st.session_state.mistake_counter = 5
-
-# Function to start the game
-def start_game(manual_word):
-    if manual_word:
-        st.session_state.word = st.text_input("Type a word: ").upper()
-    else:
-        st.session_state.word = random.choice(list_of_words).upper()
-    
-    st.session_state.hidden_word = '_ ' * len(st.session_state.word)
-    st.session_state.mistake_counter = 5
+if 'picked_letters' not in st.session_state:
+    st.session_state.picked_letters = set()
 
 # Hangman pictures
 hangman_pic = [
@@ -70,41 +62,47 @@ hangman_pic = [
 '''
 ]
 
-# Game logic
-def pick_letter():
+# Game setup: choose between random word or manual input
+choice = st.radio("Choose how to provide a word:", ('Random word', 'Manual input'))
+
+if choice == 'Manual input':
+    word_input = st.text_input('Type a word: ')
+    if word_input:
+        st.session_state.word = word_input.upper()
+else:
+    if st.button("Generate random word"):
+        st.session_state.word = random.choice(list_of_words).upper()
+
+# Once the word is chosen
+if st.session_state.word:
+    if not st.session_state.hidden_word:
+        st.session_state.hidden_word = '_ ' * len(st.session_state.word)
+
+    # Show the hidden word
+    st.write(f'The hidden word is: {st.session_state.hidden_word}')
+
+    # Pick a letter
     picked_letter = st.text_input("Pick a letter:", "").upper()
 
-    if picked_letter and picked_letter in st.session_state.word:
-        letter_index = 0
-        updated_word = list(st.session_state.hidden_word)
+    if picked_letter and picked_letter not in st.session_state.picked_letters:
+        st.session_state.picked_letters.add(picked_letter)
 
-        for letter in st.session_state.word:
-            if letter == picked_letter:
-                updated_word[letter_index] = picked_letter
-            letter_index += 2
+        if picked_letter in st.session_state.word:
+            # Update hidden word
+            hidden_word_list = list(st.session_state.hidden_word)
+            for index, letter in enumerate(st.session_state.word):
+                if letter == picked_letter:
+                    hidden_word_list[index * 2] = picked_letter
+            st.session_state.hidden_word = ''.join(hidden_word_list)
 
-        st.session_state.hidden_word = ''.join(updated_word)
-
-        if st.session_state.hidden_word.replace(' ', '') == st.session_state.word:
-            st.success(f"CONGRATULATIONS! The hidden word was: {st.session_state.word}")
-    elif picked_letter:
-        if st.session_state.mistake_counter == 0:
-            st.error(f"HANGED! The hidden word was: {st.session_state.word}")
-            st.text(hangman_pic[st.session_state.mistake_counter])
+            if st.session_state.hidden_word.replace(' ', '') == st.session_state.word:
+                st.success(f'CONGRATULATIONS! You guessed the word: {st.session_state.word}')
         else:
             st.session_state.mistake_counter -= 1
-            st.warning(f"WRONG! Number of mistakes left: {st.session_state.mistake_counter}")
+            st.write(f'WRONG! Mistakes left: {st.session_state.mistake_counter}')
             st.text(hangman_pic[st.session_state.mistake_counter])
 
-# User interface
-st.title("Hangman Game")
-
-# Game start options
-choice = st.radio("Choose how to start:", ('Random word', 'Manual input'))
-if st.button("Start Game"):
-    start_game(choice == 'Manual input')
-
-# Display hidden word and allow guessing if the game has started
-if st.session_state.word:
-    st.text(f"The hidden word is: {st.session_state.hidden_word}")
-    pick_letter()
+        # End game if no mistakes left
+        if st.session_state.mistake_counter == 0:
+            st.error(f'HANGED! The correct word was: {st.session_state.word}')
+            st.text(hangman_pic[st.session_state.mistake_counter])
